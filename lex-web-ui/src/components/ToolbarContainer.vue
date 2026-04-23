@@ -1,0 +1,674 @@
+<template>
+  <!-- eslint-disable max-len -->
+  <v-toolbar
+    elevation="3"
+    :color="toolbarColor"
+    v-if="!isUiMinimized"
+    @click="toolbarClickHandler"
+    :density="density"
+    :class="{ minimized: isUiMinimized }"
+  >
+  <!-- eslint-enable max-len -->
+    <img
+      class="toolbar-image"
+      v-if="toolbarLogo"
+      :src="toolbarLogo"
+      alt="logo"
+      aria-hidden="true"
+    />
+    <v-avatar
+      v-else-if="showBrandedToolbarAvatar"
+      class="toolbar-image toolbar-image-avatar"
+      :size="40"
+      :color="toolbarAvatarColor"
+    >
+      <v-icon color="white" size="24">local_florist</v-icon>
+    </v-avatar>
+
+    <v-menu v-if="showToolbarMenu">
+      <template v-slot:activator="{ props }">
+        <v-btn
+          v-bind="props"
+          v-show="!isUiMinimized"
+          v-on="tooltipMenuEventHandlers"
+          class="menu"
+          icon="menu"
+          size="small"
+          aria-label="menu options"
+        ></v-btn>
+      </template>
+
+      <v-list role="list">
+        <v-list-item role="listitem" v-if="isEnableLogin">
+          <v-btn v-if="isLoggedIn" @click="requestLogout" aria-label="logout">
+            <v-icon>
+              {{ items[1].icon }}
+            </v-icon>
+            {{ items[1].title }}
+          </v-btn>
+          <v-btn v-if="!isLoggedIn" @click="requestLogin" aria-label="login">
+            <v-icon>
+              {{ items[0].icon }}
+            </v-icon>
+            {{ items[0].title }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item role="listitem" v-if="isSaveHistory">
+          <v-btn @click="requestResetHistory" aria-label="clear chat history">
+            <v-icon>
+              {{ items[2].icon }}
+            </v-icon>
+            {{ items[2].title }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item role="listitem" v-if="shouldRenderSfxButton && isSFXOn">
+          <v-btn @click="toggleSFXMute" aria-label="mute sound effects">
+            <v-icon>
+              {{ items[3].icon }}
+            </v-icon>
+            {{ items[3].title }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item role="listitem" v-if="shouldRenderSfxButton && !isSFXOn">
+          <v-btn @click="toggleSFXMute" aria-label="unmute sound effects">
+            <v-icon>
+              {{ items[4].icon }}
+            </v-icon>
+            {{ items[4].title }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item role="listitem" v-if="canLiveChat">
+          <v-btn @click="requestLiveChat" :aria-label="toolbarStartLiveChatLabel">
+            <v-icon>
+              {{ toolbarStartLiveChatIcon }}
+            </v-icon>
+            {{ toolbarStartLiveChatLabel }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item role="listitem" v-if="isLiveChat">
+          <v-btn @click="endLiveChat" aria-label="end live chat">
+            <v-icon>
+              {{ toolbarEndLiveChatIcon }}
+            </v-icon>
+            {{ toolbarEndLiveChatLabel }}
+          </v-btn>
+        </v-list-item>
+        <v-list-item v-if="isLocaleSelectable" :disabled="restrictLocaleChanges" v-for="(locale, index) in locales" role="listitem" :key="index">
+          <v-btn :aria-label="locale" :key="index" class="menu-item" elevation="0" @click="setLocale(locale)">
+            {{ locale }}
+          </v-btn>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+
+    <div class="nav-buttons">
+      <v-tooltip
+        text="Previous"
+        v-model="prevNav"
+        activator=".nav-button-prev"
+        content-class="tooltip-custom"
+        location="right"
+      >
+        <template v-slot:activator="{ props }">
+          <v-btn
+            v-bind="props"
+            size="small"
+            :disabled="isLexProcessing"
+            class="nav-button-prev"
+            v-on="prevNavEventHandlers"
+            @click="onPrev"
+            v-show="hasPrevUtterance && !isUiMinimized && shouldRenderBackButton"
+            aria-label="go back to previous message"
+            icon="arrow_back"
+          ></v-btn>
+        </template>
+      </v-tooltip>
+    </div>
+
+    <v-toolbar-title
+      class="hidden-xs-and-down toolbar-title toolbar-maggi-title"
+      @click.stop="toggleMinimize"
+      v-show="!isUiMinimized"
+    >
+      <div class="toolbar-maggi-block">
+        <h2 class="toolbar-maggi-heading">{{ toolbarTitle }} {{ userName }}</h2>
+        <div
+          v-if="showToolbarStatus"
+          class="toolbar-maggi-status"
+        >
+          <span class="toolbar-maggi-status-dot" aria-hidden="true"></span>
+          <span class="toolbar-maggi-status-text">{{ toolbarStatusText }}</span>
+        </div>
+      </div>
+    </v-toolbar-title>
+
+    <!-- tooltip should be before btn to avoid right margin issue in mobile -->
+    <v-tooltip
+      v-model="shouldShowTooltip"
+      content-class="tooltip-custom"
+      activator=".min-max-toggle"
+      location="left"
+    >
+      <span id="min-max-tooltip">{{ toolTipMinimize }}</span>
+    </v-tooltip>
+    <v-tooltip
+      v-model="shouldShowHelpTooltip"
+      content-class="tooltip-custom"
+      activator=".help-toggle"
+      location="left"
+    >
+      <span id="help-tooltip">help</span>
+    </v-tooltip>
+    <v-tooltip
+      v-model="shouldShowEndLiveChatTooltip"
+      content-class="tooltip-custom"
+      activator=".end-live-chat-btn"
+      location="left"
+    >
+      <span id="end-live-chat-tooltip">{{ toolbarEndLiveChatLabel }}</span>
+    </v-tooltip>
+    <v-tooltip
+      v-model="shouldShowMenuTooltip"
+      content-class="tooltip-custom"
+      activator=".menu"
+      location="right"
+    >
+      <span id="menu-tooltip">menu</span>
+    </v-tooltip>
+    <span v-if="isLocaleSelectable" class="localeInfo">{{currentLocale}}</span>
+    <v-btn
+      aria-label="Help"
+      v-if="shouldRenderHelpButton && !isLiveChat && !isUiMinimized"
+      v-on:click="sendHelp"
+      v-on="tooltipHelpEventHandlers"
+      v-bind:disabled="isLexProcessing"
+      icon
+      class="help-toggle"
+    >
+      <v-icon> help_outline </v-icon>
+    </v-btn>
+    <v-btn
+      v-if="isLiveChat && !isUiMinimized"
+      v-on:click="endLiveChat"
+      v-on="tooltipEndLiveChatEventHandlers"
+      v-bind:disabled="!isLiveChat"
+      icon
+      class="end-live-chat-btn"
+    >
+      <span class="hangup-text">{{ toolbarEndLiveChatLabel }}</span>
+      <v-icon class="call-end"> {{ toolbarEndLiveChatIcon }} </v-icon>
+    </v-btn>
+
+    <v-btn
+      v-if="$store.state.isRunningEmbedded"
+      v-on:click.stop="toggleMinimize"
+      v-on="tooltipEventHandlers"
+      class="min-max-toggle"
+      icon
+      v-bind:aria-label="isUiMinimized ? 'chat' : 'minimize chat window toggle'"
+    >
+      <v-icon>
+        {{ isUiMinimized ? "chat" : toolbarMinimizeButtonIcon }}
+      </v-icon>
+    </v-btn>
+  </v-toolbar>
+</template>
+
+<script>
+/*
+Copyright 2017-2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Licensed under the Amazon Software License (the "License"). You may not use this file
+except in compliance with the License. A copy of the License is located at
+
+http://aws.amazon.com/asl/
+
+or in the "license" file accompanying this file. This file is distributed on an "AS IS"
+BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the
+License for the specific language governing permissions and limitations under the License.
+*/
+import { chatMode, liveChatStatus } from '@/store/state';
+
+export default {
+  name: 'toolbar-container',
+  data() {
+    return {
+      items: [
+        { title: 'Login', icon: 'login' },
+        { title: 'Logout', icon: 'logout' },
+        { title: 'Clear Chat', icon: 'delete' },
+        { title: 'Mute', icon: 'volume_up' },
+        { title: 'Unmute', icon: 'volume_off' },
+      ],
+      shouldShowTooltip: false,
+      shouldShowHelpTooltip: false,
+      shouldShowMenuTooltip: false,
+      shouldShowEndLiveChatTooltip: false,
+      prevNav: false,
+      prevNavEventHandlers: {
+        mouseenter: this.mouseOverPrev,
+        mouseleave: this.mouseOverPrev,
+        touchstart: this.mouseOverPrev,
+        touchend: this.mouseOverPrev,
+        touchcancel: this.mouseOverPrev,
+      },
+      tooltipHelpEventHandlers: {
+        mouseenter: this.onHelpButtonHoverEnter,
+        mouseleave: this.onHelpButtonHoverLeave,
+        touchstart: this.onHelpButtonHoverEnter,
+        touchend: this.onHelpButtonHoverLeave,
+        touchcancel: this.onHelpButtonHoverLeave,
+      },
+      tooltipMenuEventHandlers: {
+        mouseenter: this.onMenuButtonHoverEnter,
+        mouseleave: this.onMenuButtonHoverLeave,
+        touchstart: this.onMenuButtonHoverEnter,
+        touchend: this.onMenuButtonHoverLeave,
+        touchcancel: this.onMenuButtonHoverLeave,
+      },
+      tooltipEventHandlers: {
+        mouseenter: this.onInputButtonHoverEnter,
+        mouseleave: this.onInputButtonHoverLeave,
+        touchstart: this.onInputButtonHoverEnter,
+        touchend: this.onInputButtonHoverLeave,
+        touchcancel: this.onInputButtonHoverLeave,
+      },
+      tooltipEndLiveChatEventHandlers: {
+        mouseenter: this.onEndLiveChatButtonHoverEnter,
+        mouseleave: this.onEndLiveChatButtonHoverLeave,
+        touchstart: this.onEndLiveChatButtonHoverEnter,
+        touchend: this.onEndLiveChatButtonHoverLeave,
+        touchcancel: this.onEndLiveChatButtonHoverLeave,
+      },
+    };
+  },
+  props: [
+    'toolbarTitle',
+    'toolbarColor',
+    'toolbarLogo',
+    'isUiMinimized',
+    'userName',
+    'toolbarStartLiveChatLabel',
+    'toolbarStartLiveChatIcon',
+    'toolbarEndLiveChatLabel',
+    'toolbarEndLiveChatIcon',
+  ],
+  computed: {
+    toolbarClickHandler() {
+      if (this.isUiMinimized) {
+        return { click: this.toggleMinimize };
+      }
+      return null;
+    },
+    toolTipMinimize() {
+      return this.isUiMinimized ? 'maximize' : 'minimize';
+    },
+    showBrandedToolbarAvatar() {
+      return !this.toolbarLogo
+        && this.$store.state.config.ui.showToolbarStatus
+        && this.$store.state.config.ui.toolbarShowDefaultAvatar;
+    },
+    showToolbarStatus() {
+      return !!this.$store.state.config.ui.showToolbarStatus;
+    },
+    toolbarStatusText() {
+      return this.$store.state.config.ui.toolbarStatusText || 'Online';
+    },
+    toolbarAvatarColor() {
+      return this.$store.state.config.ui.toolbarAvatarColor || '#1e3a5f';
+    },
+    toolbarMinimizeButtonIcon() {
+      return this.$store.state.config.ui.toolbarMinimizeButtonIcon || 'arrow_drop_down';
+    },
+    isEnableLogin() {
+      return this.$store.state.config.ui.enableLogin;
+    },
+    isForceLogin() {
+      return this.$store.state.config.ui.forceLogin;
+    },
+    hasPrevUtterance() {
+      return this.$store.state.utteranceStack.length > 1;
+    },
+    isLoggedIn() {
+      return this.$store.state.isLoggedIn;
+    },
+    isSaveHistory() {
+      return this.$store.state.config.ui.saveHistory;
+    },
+    canLiveChat() {
+      return (this.$store.state.config.ui.enableLiveChat &&
+      this.$store.state.chatMode === chatMode.BOT &&
+      (this.$store.state.liveChat.status === liveChatStatus.DISCONNECTED ||
+      this.$store.state.liveChat.status === liveChatStatus.ENDED)
+      );
+    },
+    isLiveChat() {
+      return (this.$store.state.config.ui.enableLiveChat &&
+      this.$store.state.chatMode === chatMode.LIVECHAT);
+    },
+    isLocaleSelectable() {
+      return this.$store.state.config.lex.v2BotLocaleId.split(',').length > 1;
+    },
+    restrictLocaleChanges() {
+      return this.$store.state.lex.isProcessing
+        || ( this.$store.state.lex.sessionState
+          && this.$store.state.lex.sessionState.dialogAction
+          && this.$store.state.lex.sessionState.dialogAction.type === 'ElicitSlot')
+        || ( this.$store.state.lex.sessionState
+          && this.$store.state.lex.sessionState.intent
+          && this.$store.state.lex.sessionState.intent.state === 'InProgress')
+    },
+    currentLocale() {
+      const priorLocale = localStorage.getItem('selectedLocale');
+      if (priorLocale) {
+        this.setLocale(priorLocale);
+      }
+      return this.$store.state.config.lex.v2BotLocaleId.split(',')[0];
+    },
+    isLexProcessing() {
+      return (
+        this.$store.state.isBackProcessing || this.$store.state.lex.isProcessing
+      );
+    },
+    shouldRenderHelpButton() {
+      return !!this.$store.state.config.ui.helpIntent;
+    },
+    shouldRenderSfxButton() {
+      return (
+        this.$store.state.config.ui.enableSFX
+        && this.$store.state.config.ui.messageSentSFX
+        && this.$store.state.config.ui.messageReceivedSFX
+      );
+    },
+    shouldRenderBackButton() {
+      return this.$store.state.config.ui.backButton;
+    },
+    isSFXOn() {
+      return this.$store.state.isSFXOn;
+    },
+    density() {
+      if (this.$store.state.isRunningEmbedded && !this.isUiMinimized)
+        return "compact"
+      else
+        return "default"
+    },
+    showToolbarMenu() {
+      return this.$store.state.config.lex.v2BotLocaleId.split(',').length > 1
+        || this.$store.state.config.ui.enableLogin
+        || this.$store.state.config.ui.saveHistory
+        || this.$store.state.config.ui.shouldRenderSfxButton
+        || this.$store.state.config.ui.enableLiveChat;
+    },
+    locales() {
+      const a = this.$store.state.config.lex.v2BotLocaleId.split(',');
+      return a;
+    },
+  },
+  methods: {
+    setLocale(l) {
+      const a = this.$store.state.config.lex.v2BotLocaleId.split(',');
+      const revised = [];
+      revised.push(l);
+      a.forEach((element) => {
+        if (element !== l) {
+          revised.push(element);
+        }
+      });
+      this.$store.commit('updateLocaleIds', revised.toString());
+      localStorage.setItem('selectedLocale', l);
+    },
+    mouseOverPrev() {
+      this.prevNav = !this.prevNav;
+    },
+    onInputButtonHoverEnter() {
+      this.shouldShowTooltip = !this.isUiMinimized;
+    },
+    onInputButtonHoverLeave() {
+      this.shouldShowTooltip = false;
+    },
+    onHelpButtonHoverEnter() {
+      this.shouldShowHelpTooltip = true;
+    },
+    onHelpButtonHoverLeave() {
+      this.shouldShowHelpTooltip = false;
+    },
+    onEndLiveChatButtonHoverEnter() {
+      this.shouldShowEndLiveChatTooltip = true;
+    },
+    onEndLiveChatButtonHoverLeave() {
+      this.shouldShowEndLiveChatTooltip = false;
+    },
+    onMenuButtonHoverEnter() {
+      this.shouldShowMenuTooltip = true;
+    },
+    onMenuButtonHoverLeave() {
+      this.shouldShowMenuTooltip = false;
+    },
+    onNavHoverEnter() {
+      this.shouldShowNavToolTip = true;
+    },
+    onNavHoverLeave() {
+      this.shouldShowNavToolTip = false;
+    },
+    toggleSFXMute() {
+      this.onInputButtonHoverLeave();
+      this.$store.dispatch('toggleIsSFXOn');
+    },
+    toggleMinimize() {
+      if (this.$store.state.isRunningEmbedded) {
+        this.onInputButtonHoverLeave();
+        this.$emit('toggleMinimizeUi');
+      }
+    },
+    isValidHelpContentForUse() {
+      const localeId = this.$store.state.config.lex.v2BotLocaleId ? this.$store.state.config.lex.v2BotLocaleId : 'en_US';
+      const helpContent = this.$store.state.config.ui.helpContent;
+      return ( helpContent && helpContent[localeId] &&
+        (
+          ( helpContent[localeId].text && helpContent[localeId].text.length > 0 ) ||
+          ( helpContent[localeId].markdown && helpContent[localeId].markdown.length > 0 )
+        )
+      )
+    },
+    shouldRepeatLastMessage() {
+      const localeId = this.$store.state.config.lex.v2BotLocaleId ? this.$store.state.config.lex.v2BotLocaleId : 'en_US';
+      const helpContent = this.$store.state.config.ui.helpContent;
+      if(helpContent && helpContent[localeId] && (helpContent[localeId].repeatLastMessage === undefined ? true : helpContent[localeId].repeatLastMessage)) {
+        return true;
+      }
+      return false;
+    },
+    messageForHelpContent() {
+      const localeId = this.$store.state.config.lex.v2BotLocaleId ? this.$store.state.config.lex.v2BotLocaleId : 'en_US';
+      const helpContent = this.$store.state.config.ui.helpContent;
+      let alts = {};
+      if (  helpContent[localeId].markdown && helpContent[localeId].markdown.length > 0 ) {
+        alts.markdown = helpContent[localeId].markdown;
+      }
+      let responseCardObject = undefined;
+      if (helpContent[localeId].responseCard) {
+        responseCardObject = {
+          "version": 1,
+          "contentType": "application/vnd.amazonaws.card.generic",
+          "genericAttachments": [
+            {
+              "title": helpContent[localeId].responseCard.title,
+              "subTitle": helpContent[localeId].responseCard.subTitle,
+              "imageUrl": helpContent[localeId].responseCard.imageUrl,
+              "attachmentLinkUrl": helpContent[localeId].responseCard.attachmentLinkUrl,
+              "buttons": helpContent[localeId].responseCard.buttons
+            }
+          ]
+        }
+        alts.markdown = helpContent[localeId].markdown;
+      }
+      return({
+        text: helpContent[localeId].text,
+          type: 'bot',
+        dialogState: '',
+        responseCard: responseCardObject,
+        alts
+      })
+    },
+    sendHelp() {
+      if (this.isValidHelpContentForUse()) {
+        let currentMessage = undefined;
+        if (this.$store.state.messages.length > 0) {
+          currentMessage = this.$store.state.messages[this.$store.state.messages.length-1];
+        }
+        this.$store.dispatch('pushMessage', this.messageForHelpContent());
+        if (currentMessage && this.shouldRepeatLastMessage()) {
+          this.$store.dispatch('pushMessage', currentMessage);
+        }
+      } else {
+        const message = {
+          type: 'human',
+          text: this.$store.state.config.ui.helpIntent,
+        };
+        this.$store.dispatch('postTextMessage', message);
+      }
+      this.shouldShowHelpTooltip = false;
+    },
+    onPrev() {
+      if (this.prevNav) {
+        this.mouseOverPrev();
+      }
+      if (!this.$store.state.isBackProcessing) {
+        this.$store.commit('popUtterance');
+        const lastUtterance = this.$store.getters.lastUtterance();
+        if (lastUtterance && lastUtterance.length > 0) {
+          const message = {
+            type: 'human',
+            text: lastUtterance,
+          };
+          this.$store.commit('toggleBackProcessing');
+          this.$store.dispatch('postTextMessage', message);
+        }
+      }
+    },
+    requestLogin() {
+      this.$emit('requestLogin');
+    },
+    requestLogout() {
+      this.$emit('requestLogout');
+    },
+    requestResetHistory() {
+      this.$store.dispatch('resetHistory');
+    },
+    requestLiveChat() {
+      this.$emit('requestLiveChat');
+    },
+    endLiveChat() {
+      this.shouldShowEndLiveChatTooltip = false;
+      this.$emit('endLiveChat');
+    },
+    toggleIsLoggedIn() {
+      this.onInputButtonHoverLeave();
+      this.$emit('toggleIsLoggedIn');
+    },
+  },
+};
+</script>
+<style>
+.toolbar-color {
+  background-color: #003da5 !important;
+}
+
+.nav-buttons {
+  padding: 0;
+  margin-left: 8px !important;
+}
+
+.nav-button-prev {
+  padding: 0;
+  margin: 0;
+}
+
+.localeInfo {
+  text-align: right;
+  margin-right: 0;
+  width: 5em !important;
+}
+
+.list .icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+}
+
+.menu__content {
+  border-radius: 4px;
+}
+
+.call-end {
+  width: 36px;
+  margin-left: 5px;
+}
+
+.hangup-text {
+}
+
+.end-live-chat-btn {
+  width: unset !important;
+}
+
+.toolbar-image {
+  margin-left: 0px !important;
+  max-height: 100%;
+}
+
+.toolbar-title {
+  width: max-content;
+}
+
+.menu-item {
+
+}
+
+.menu-item:focus {
+  box-shadow: 0 1.25px 3.75px rgba(0,0,0,0.25), 0 1.25px 2.5px rgba(0,0,0,0.22) !important;
+}
+
+.toolbar-maggi-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+  padding: 0.2rem 0;
+}
+.toolbar-maggi-heading {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin: 0;
+}
+.toolbar-maggi-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.1rem;
+}
+.toolbar-maggi-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2e7d32;
+  flex-shrink: 0;
+}
+.toolbar-maggi-status-text {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #78909c;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.toolbar-maggi-title {
+  flex-grow: 1;
+}
+.toolbar-image-avatar {
+  margin-right: 0.5rem;
+}
+
+</style>
+

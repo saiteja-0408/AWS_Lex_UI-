@@ -1,0 +1,10 @@
+/* CSS overrides to fix calc-size() compatibility issues */
+.v-time-picker .v-picker__body {
+  /* Override the problematic calc-size() with a fallback */
+  max-height: max-content !important;
+}
+
+.v-time-picker--variant-dial .v-time-picker-controls__field-label {
+  /* Ensure proper styling for time picker labels */
+  transition-behavior: allow-discrete;
+}

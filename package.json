@@ -1,0 +1,74 @@
+{
+  "name": "aws-lex-web-ui",
+  "version": "0.24.0",
+  "type": "module",
+  "description": "Sample Amazon Lex Web Interface",
+  "main": "lex-web-ui/dist/bundle/lex-web-ui.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awslabs/aws-lex-web-ui.git"
+  },
+  "keywords": [
+    "aws",
+    "lex",
+    "bot",
+    "chatbot",
+    "web",
+    "interface",
+    "ui"
+  ],
+  "author": "AWS",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/awslabs/aws-lex-web-ui/issues"
+  },
+  "homepage": "https://github.com/awslabs/aws-lex-web-ui#readme",
+  "scripts": {
+    "start": "node server.js",                  
+    "serve": "cd lex-web-ui && npm run serve",
+    "build": "cd lex-web-ui && npm run build",
+    "build:dev": "cd lex-web-ui && npm run build:dev",
+    "build:lib-dev": "cd lex-web-ui && npm run build:lib-dev",
+    "build:lib-prod": "cd lex-web-ui && npm run build:lib-prod",
+    "build-dist": "cd lex-web-ui && npm run build-dist",
+    "build-prod": "cross-env NODE_ENV=production vite build",
+    "build-dev": "cross-env NODE_ENV=development vite build",
+    "dev": "cd lex-web-ui && npm run serve",
+    "serve-loader": "vite",
+    "lint": "eslint --format node_modules/eslint-formatter-friendly src/lex-web-ui-loader"
+  },
+  "dependencies": {
+    "amazon-cognito-auth-js": "^1.2.4",
+    "@aws-sdk/client-cognito-identity": "^3.1015.0",
+    "@aws-sdk/credential-providers": "^3.1015.0",
+    "core-js": "^3.6.5",
+    "jsdom": "^22.0.0",
+    "jwt-decode": "^4.0.0",
+    "process": "^0.11.10",
+    "regenerator-runtime": "^0.13.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.5",
+    "@babel/plugin-transform-runtime": "^7.23.4",
+    "@babel/preset-env": "^7.23.5",
+    "autoprefixer": "^10.4.16",
+    "babel-eslint": "^10.1.0",
+    "cross-env": "^10.1.0",
+    "cssnano": "^6.0.1",
+    "eslint": "^8.55.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-formatter-friendly": "^7.0.0",
+    "eslint-plugin-import": "^2.20.2",
+    "express": "^4.17.1",
+    "postcss": "^8.4.32",
+    "vite": "^7.3.1",
+    "vite-plugin-node-polyfills": "^0.24.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
+  },
+  "browserslist": [
+    "defaults and fully supports es6-module"
+  ]
+}
